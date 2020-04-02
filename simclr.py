@@ -24,10 +24,10 @@ class SimCLR:
         self.processor = 'cuda' if torch.cuda.is_available() else 'cpu'
         self.loss_function = NtXent(self.processor, self.batch_size)
 
-    def step(self, model, xi, xj):
-        # apply base encoder + projection head
-        hi, zi = model(xi)
-        hj, zj = model(xj)
+    def step(self, res_net, xi, xj):
+        # get base encoder + projection head
+        hi, zi = res_net(xi)
+        hj, zj = res_net(xj)
         # normalize
         zi = F.normalize(zi, dim=1)
         zj = F.normalize(zj, dim=1)
@@ -76,28 +76,28 @@ class SimCLR:
             adam_optimizer.step()
             self.number_of_training_steps += 1
 
-    def load_pre_trained_weights(self, model):
+    def load_pre_trained_weights(self, res_net):
         try:
             model_folder = os.path.join(load_weights_path, 'model')
             state_dict = torch.load(os.path.join(model_folder, 'model.pth'))
-            model.load_state_dict(state_dict)
+            res_net.load_state_dict(state_dict)
         except FileNotFoundError:
             print("Start new training")
-        return model
+        return res_net
 
-    def validate(self, model, valid_loader):
+    def validate(self, res_net, valid_loader):
         # validation steps
         with torch.no_grad():
-            model.eval()
+            res_net.eval()
 
             valid_loss = 0.0
             for counter, ((xi, xj), _) in enumerate(valid_loader):
                 xi = xi.to(self.processor)
                 xj = xj.to(self.processor)
 
-                loss = self.step(model, xi, xj)
+                loss = self.step(res_net, xi, xj)
                 valid_loss += loss.item()
 
             valid_loss /= counter
-        model.train()
+        res_net.train()
         return valid_loss
